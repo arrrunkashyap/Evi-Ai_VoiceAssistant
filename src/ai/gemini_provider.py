@@ -1,4 +1,4 @@
-print("Loaded GeminiProvider from:", __file__)
+print("Inside GeminiProvider")
 from google import genai
 from google.genai.errors import ClientError
 from src.prompts.system_prompt import SYSTEM_PROMPT
@@ -35,7 +35,7 @@ class GeminiProvider(BaseProvider):
             return f"Unexpected error: {e}"
 
     def stream(self, prompt: str, history=None):
-        print("Inside GeminiProvider.stream()")
+        
         contents = [
             {
                 "role": "user",

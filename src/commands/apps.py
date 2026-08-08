@@ -4,22 +4,32 @@ import subprocess
 
 
 def _open(executable: str, success: str, fail: str):
-
     try:
-
         if shutil.which(executable):
-
             subprocess.Popen([executable])
-
             return success
 
         return fail
 
     except Exception as e:
-
         return f"{fail} ({e})"
 
 
+def _close(process_name: str, success: str, fail: str):
+    try:
+        result = subprocess.run(
+            ["taskkill", "/IM", process_name, "/F"],
+            capture_output=True,
+            text=True
+        )
+
+        if result.returncode == 0:
+            return success
+
+        return fail
+
+    except Exception as e:
+        return f"{fail} ({e})"
 # ---------------- Chrome ---------------- #
 
 def open_chrome():
@@ -191,3 +201,38 @@ def open_task_manager():
         "Unable to open Task Manager."
 
     )
+
+# ---------------- WhatsApp ----------------
+
+def open_whatsapp():
+
+    try:
+        # WhatsApp Desktop protocol
+        os.startfile("whatsapp:")
+
+        return "Opening WhatsApp."
+
+    except Exception:
+        pass
+
+    # Common WhatsApp Desktop installation locations
+    whatsapp_paths = [
+        os.path.expandvars(
+            r"%LOCALAPPDATA%\WhatsApp\WhatsApp.exe"
+        ),
+        os.path.expandvars(
+            r"%LOCALAPPDATA%\Programs\WhatsApp\WhatsApp.exe"
+        ),
+        r"C:\Program Files\WhatsApp\WhatsApp.exe",
+        r"C:\Program Files (x86)\WhatsApp\WhatsApp.exe"
+    ]
+
+    for path in whatsapp_paths:
+
+        if os.path.exists(path):
+
+            subprocess.Popen([path])
+
+            return "Opening WhatsApp."
+
+    return "WhatsApp is not installed."
