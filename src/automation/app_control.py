@@ -13,40 +13,71 @@ import pygetwindow as gw
 APP_MAP = {
     "chrome": {
         "exe": "chrome.exe",
-        "command": "chrome"
+        "command": "chrome",
+        "paths": [
+            r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+            r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+        ],
     },
     "edge": {
         "exe": "msedge.exe",
-        "command": "msedge"
+        "command": "msedge",
+        "paths": [
+            r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
+            r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+        ],
     },
     "firefox": {
         "exe": "firefox.exe",
-        "command": "firefox"
+        "command": "firefox",
+        "paths": [
+            r"C:\Program Files\Mozilla Firefox\firefox.exe",
+            r"C:\Program Files (x86)\Mozilla Firefox\firefox.exe",
+        ],
     },
     "vscode": {
         "exe": "Code.exe",
-        "command": "code"
+        "command": "code",
+        "paths": [
+            os.path.expandvars(r"%LOCALAPPDATA%\Programs\Microsoft VS Code\Code.exe"),
+            r"C:\Program Files\Microsoft VS Code\Code.exe",
+        ],
     },
     "notepad": {
         "exe": "notepad.exe",
-        "command": "notepad"
+        "command": "notepad",
+        "paths": [],
     },
     "calculator": {
         "exe": "CalculatorApp.exe",
-        "command": "calc"
+        "command": "calc",
+        "paths": [],
     },
     "cmd": {
         "exe": "cmd.exe",
-        "command": "cmd"
+        "command": "cmd",
+        "paths": [],
     },
     "powershell": {
         "exe": "powershell.exe",
-        "command": "powershell"
+        "command": "powershell",
+        "paths": [],
+    },
+    "paint": {
+        "exe": "mspaint.exe",
+        "command": "mspaint",
+        "paths": [],
+    },
+    "taskmanager": {
+        "exe": "Taskmgr.exe",
+        "command": "taskmgr",
+        "paths": [],
     },
     "explorer": {
         "exe": "explorer.exe",
-        "command": "explorer"
-    }
+        "command": "explorer",
+        "paths": [],
+    },
 }
 
 def is_running(app_name: str) -> bool:
@@ -107,23 +138,31 @@ def open_app(app_name: str):
     command = APP_MAP[app_name]["command"]
 
     try:
-        subprocess.Popen(command)
-
-        return True, f"Opening {app_name}."
-
-    except FileNotFoundError:
+        # Prefer known Windows installation paths for applications such as
+        # Chrome/Edge/Firefox/VS Code, then fall back to PATH.
+        for path in APP_MAP[app_name].get("paths", []):
+            if path and os.path.exists(path):
+                subprocess.Popen([path])
+                return True, f"Opening {app_name}."
 
         executable = shutil.which(command)
-
         if executable:
-            subprocess.Popen(executable)
+            subprocess.Popen([executable])
             return True, f"Opening {app_name}."
 
         return False, f"{app_name} is not installed."
 
     except Exception as e:
-
         return False, str(e)
+
+
+def restart_app(app_name: str):
+    """Restart a registered application."""
+    closed, _ = close_app(app_name)
+    if not closed and not is_running(app_name):
+        # It is okay if the app was already closed; continue to opening it.
+        pass
+    return open_app(app_name)
 
 
 def close_app(app_name: str):

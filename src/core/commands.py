@@ -4,6 +4,14 @@ from src.commands.files import *
 from src.commands.system import *
 from src.commands.datetime_cmd import *
 
+from src.automation.resolver import resolve_command
+from src.automation.app_control import (
+    open_app,
+    close_app,
+    focus_window,
+    restart_app,
+)
+
 
 # ---------------- Command Lists ---------------- #
 
@@ -230,40 +238,52 @@ def execute_command(command: str):
 
         return "EXIT"
 
-    # ---------- Apps ---------- #
+    # ---------- Natural-language desktop apps ---------- #
 
-    if any(c in command for c in COMMANDS["chrome"]):
-        return open_chrome()
+    # Resolve the user's whole sentence before the legacy app commands.
+    # This prevents "Chrome" from automatically meaning "open Chrome".
+    intent = resolve_command(command)
 
-    if any(c in command for c in COMMANDS["edge"]):
-        return open_edge()
+    if intent:
+        if intent.name == "open_app":
+            _, message = open_app(intent.target)
+            return message
 
-    if any(c in command for c in COMMANDS["firefox"]):
-        return open_firefox()
+        if intent.name == "close_app":
+            _, message = close_app(intent.target)
+            return message
 
-    if any(c in command for c in COMMANDS["vscode"]):
-        return open_vscode()
+        if intent.name == "focus_app":
+            if focus_window(intent.target):
+                return f"Switched to {intent.target}."
+            return f"I couldn't find an open {intent.target} window."
 
-    if any(c in command for c in COMMANDS["notepad"]):
-        return open_notepad()
+        if intent.name == "restart_app":
+            _, message = restart_app(intent.target)
+            return message
 
-    if any(c in command for c in COMMANDS["calculator"]):
-        return open_calculator()
+    # ---------- Legacy app commands ---------- #
 
-    if any(c in command for c in COMMANDS["paint"]):
-        return open_paint()
+    # Keep the old exact commands working. Do not use substring matching
+    # here, otherwise a sentence such as "tell me about Chrome" could
+    # accidentally trigger an application command.
+    legacy_app_handlers = {
+        "chrome": open_chrome,
+        "edge": open_edge,
+        "firefox": open_firefox,
+        "vscode": open_vscode,
+        "notepad": open_notepad,
+        "calculator": open_calculator,
+        "paint": open_paint,
+        "explorer": open_explorer,
+        "cmd": open_cmd,
+        "powershell": open_powershell,
+        "taskmanager": open_task_manager,
+    }
 
-    if any(c in command for c in COMMANDS["explorer"]):
-        return open_explorer()
-
-    if any(c in command for c in COMMANDS["cmd"]):
-        return open_cmd()
-
-    if any(c in command for c in COMMANDS["powershell"]):
-        return open_powershell()
-
-    if any(c in command for c in COMMANDS["taskmanager"]):
-        return open_task_manager()
+    for key, handler in legacy_app_handlers.items():
+        if command in COMMANDS[key]:
+            return handler()
 
     # ---------- Browser ---------- #
 
