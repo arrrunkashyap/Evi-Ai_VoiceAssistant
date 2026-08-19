@@ -52,6 +52,12 @@ def open_chrome():
 
     return "Google Chrome is not installed."
 
+def close_chrome():
+    return _close(
+        "chrome.exe",
+        "Closing Google Chrome.",
+        "Google Chrome is not running."
+    )
 
 # ---------------- Edge ---------------- #
 

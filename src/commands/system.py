@@ -1,9 +1,8 @@
 import ctypes
-import os
 import shutil
 import subprocess
-
 import psutil
+from datetime import datetime
 
 
 # ---------- Lock Computer ---------- #
@@ -11,13 +10,14 @@ import psutil
 def lock_pc():
 
     try:
+        result = ctypes.windll.user32.LockWorkStation()
 
-        ctypes.windll.user32.LockWorkStation()
+        if result:
+            return "Locking your computer."
 
-        return "Locking your computer."
+        return "Unable to lock computer."
 
     except Exception as e:
-
         return f"Unable to lock computer. ({e})"
 
 
@@ -26,13 +26,20 @@ def lock_pc():
 def shutdown(delay: int = 5):
 
     try:
-
-        os.system(f"shutdown /s /t {delay}")
+        subprocess.run(
+            ["shutdown", "/s", "/t", str(delay)],
+            check=True,
+            capture_output=True,
+            text=True
+        )
 
         return f"Shutting down in {delay} seconds."
 
-    except Exception as e:
+    except subprocess.CalledProcessError as e:
+        error = e.stderr.strip() if e.stderr else "Windows command failed."
+        return f"Shutdown failed. ({error})"
 
+    except Exception as e:
         return f"Shutdown failed. ({e})"
 
 
@@ -41,13 +48,20 @@ def shutdown(delay: int = 5):
 def restart(delay: int = 5):
 
     try:
-
-        os.system(f"shutdown /r /t {delay}")
+        subprocess.run(
+            ["shutdown", "/r", "/t", str(delay)],
+            check=True,
+            capture_output=True,
+            text=True
+        )
 
         return f"Restarting in {delay} seconds."
 
-    except Exception as e:
+    except subprocess.CalledProcessError as e:
+        error = e.stderr.strip() if e.stderr else "Windows command failed."
+        return f"Restart failed. ({error})"
 
+    except Exception as e:
         return f"Restart failed. ({e})"
 
 
@@ -56,13 +70,14 @@ def restart(delay: int = 5):
 def logout():
 
     try:
-
-        os.system("shutdown /l")
+        subprocess.run(
+            ["shutdown", "/l"],
+            check=True
+        )
 
         return "Logging out."
 
     except Exception as e:
-
         return f"Logout failed. ({e})"
 
 
@@ -71,13 +86,19 @@ def logout():
 def cancel_shutdown():
 
     try:
-
-        os.system("shutdown /a")
+        subprocess.run(
+            ["shutdown", "/a"],
+            check=True,
+            capture_output=True,
+            text=True
+        )
 
         return "Shutdown cancelled."
 
-    except Exception as e:
+    except subprocess.CalledProcessError:
+        return "There is no pending shutdown to cancel."
 
+    except Exception as e:
         return f"Unable to cancel shutdown. ({e})"
 
 
@@ -86,15 +107,18 @@ def cancel_shutdown():
 def sleep():
 
     try:
-
-        os.system(
-            "rundll32.exe powrprof.dll,SetSuspendState 0,1,0"
+        result = ctypes.windll.powrprof.SetSuspendState(
+            False,  # Hibernate = False
+            True,   # Force sleep
+            False   # Disable wake events = False
         )
 
-        return "Putting computer to sleep."
+        if result:
+            return "Putting computer to sleep."
+
+        return "Unable to put computer to sleep."
 
     except Exception as e:
-
         return f"Sleep failed. ({e})"
 
 
@@ -103,13 +127,20 @@ def sleep():
 def hibernate():
 
     try:
-
-        os.system("shutdown /h")
+        subprocess.run(
+            ["shutdown", "/h"],
+            check=True,
+            capture_output=True,
+            text=True
+        )
 
         return "Hibernating computer."
 
-    except Exception as e:
+    except subprocess.CalledProcessError as e:
+        error = e.stderr.strip() if e.stderr else "Windows command failed."
+        return f"Hibernate failed. ({error})"
 
+    except Exception as e:
         return f"Hibernate failed. ({e})"
 
 
@@ -118,21 +149,21 @@ def hibernate():
 def empty_recycle_bin():
 
     try:
-
         subprocess.run(
             [
                 "powershell",
+                "-NoProfile",
                 "-Command",
                 "Clear-RecycleBin -Force"
             ],
             check=True,
-            capture_output=True
+            capture_output=True,
+            text=True
         )
 
         return "Recycle Bin emptied."
 
     except Exception as e:
-
         return f"Unable to empty Recycle Bin. ({e})"
 
 
@@ -151,8 +182,8 @@ def ram_usage():
 
     return (
         f"RAM usage is {ram.percent} percent. "
-        f"{round(ram.used / (1024**3),2)} GB used of "
-        f"{round(ram.total / (1024**3),2)} GB."
+        f"{round(ram.used / (1024**3), 2)} GB used of "
+        f"{round(ram.total / (1024**3), 2)} GB."
     )
 
 
@@ -163,9 +194,7 @@ def disk_usage():
     disk = shutil.disk_usage("C:\\")
 
     used = round(disk.used / (1024**3), 2)
-
     total = round(disk.total / (1024**3), 2)
-
     percent = round((disk.used / disk.total) * 100, 1)
 
     return (
@@ -179,9 +208,6 @@ def disk_usage():
 def uptime():
 
     boot = psutil.boot_time()
-
-    from datetime import datetime
-
     boot_time = datetime.fromtimestamp(boot)
 
     return (
@@ -197,7 +223,6 @@ def battery_status():
     battery = psutil.sensors_battery()
 
     if battery is None:
-
         return "Battery information is unavailable."
 
     status = "charging" if battery.power_plugged else "not charging"
