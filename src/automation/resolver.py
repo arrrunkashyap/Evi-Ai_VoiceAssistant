@@ -56,6 +56,7 @@ OPEN_WORDS = ("open", "launch", "start", "run", "bring up", "load")
 CLOSE_WORDS = ("close", "quit", "exit", "shut", "terminate", "get rid of", "get it out of the way", "get that out of the way", "finished with", "done with")
 FOCUS_WORDS = ("switch to", "switch back to", "focus on", "bring me to", "go to")
 RESTART_WORDS = ("restart", "relaunch")
+SEARCH_WORDS = ("search","look up","find",)
 
 
 def _contains(text: str, phrases) -> bool:
@@ -82,6 +83,115 @@ def _intent(intent: str, target: Optional[str] = None, **params):
     result.update(params)
     return result
 
+def _extract_search_command(text: str) -> Optional[dict]:
+    """
+    Extract a natural-language search request.
+
+    Examples:
+        search google leetcode
+        search google for leetcode
+        search youtube for python tutorials
+        look up leetcode on google
+        find python sockets
+    """
+
+    # Remove common conversational prefixes
+    text = re.sub(
+        r"^(?:hey\s+evi[,\s]*)?",
+        "",
+        text
+    )
+
+    text = re.sub(
+        r"^(?:please\s+|can you\s+|could you\s+|would you\s+|"
+        r"will you\s+)?",
+        "",
+        text
+    ).strip()
+
+    # ---------------------------------------------------------
+    # Pattern 1:
+    # search google for <query>
+    # search youtube for <query>
+    # ---------------------------------------------------------
+
+    match = re.match(
+        r"^(?:search|look up|find)"
+        r"\s+(?:on\s+)?"
+        r"(google|youtube|github|maps)"
+        r"\s+(?:for\s+)?"
+        r"(.+)$",
+        text
+    )
+
+    if match:
+        engine = match.group(1)
+        query = match.group(2).strip()
+
+        if query:
+            return _intent(
+                "search",
+                engine,
+                query=query,
+                confidence=0.98
+            )
+
+    # ---------------------------------------------------------
+    # Pattern 2:
+    # search for <query> on google
+    # search for <query> on youtube
+    # ---------------------------------------------------------
+
+    match = re.match(
+        r"^(?:search|look up|find)"
+        r"\s+(?:for\s+)?"
+        r"(.+?)"
+        r"\s+(?:on|using)\s+"
+        r"(google|youtube|github|maps)$",
+        text
+    )
+
+    if match:
+        query = match.group(1).strip()
+        engine = match.group(2)
+
+        if query:
+            return _intent(
+                "search",
+                engine,
+                query=query,
+                confidence=0.98
+            )
+
+    # ---------------------------------------------------------
+    # Pattern 3:
+    # search for <query>
+    # look up <query>
+    # find <query>
+    #
+    # Default search engine = Google
+    # ---------------------------------------------------------
+
+    match = re.match(
+        r"^(?:search|look up|find)"
+        r"\s+(?:for\s+)?"
+        r"(.+)$",
+        text
+    )
+
+    if match:
+        query = match.group(1).strip()
+
+        if query:
+            return _intent(
+                "search",
+                "google",
+                query=query,
+                confidence=0.90
+            )
+
+    return None
+
 
 def resolve_command(user_text: str) -> Optional[dict]:
     """Resolve a common natural-language command without executing it."""
@@ -98,10 +208,13 @@ def resolve_command(user_text: str) -> Optional[dict]:
     if _has_negation(text):
         return None
 
-    # Search commands are handled before generic website opening.
-    search_match = re.match(r"^(?:please\s+)?search\s+(google|youtube|github|maps)\s+(.+)$", text)
-    if search_match:
-        return _intent("search", search_match.group(1), query=search_match.group(2), confidence=0.98)
+
+    # Natural-language search commands
+
+    search_result = _extract_search_command(text)
+
+    if search_result:
+        return search_result
 
     wiki_match = re.match(r"^(?:please\s+)?(?:search\s+)?wikipedia\s+(?:for\s+)?(.+)$", text)
     if wiki_match:
@@ -119,12 +232,38 @@ def resolve_command(user_text: str) -> Optional[dict]:
             return _intent("open_app", app)
 
     website = _find_alias(text, WEBSITE_ALIASES)
-    if website and _contains(text, OPEN_WORDS + FOCUS_WORDS):
-        return _intent("open_website", website)
+
+    if website:
+        website_action_words = OPEN_WORDS + FOCUS_WORDS + (
+            "take me to",
+            "navigate to",
+            "visit",
+            "browse",
+        )
+
+        if _contains(text, website_action_words):
+            return _intent(
+                "open_website",
+                website,
+                confidence=0.96
+            )
 
     folder = _find_alias(text, FOLDER_ALIASES)
-    if folder and _contains(text, OPEN_WORDS):
-        return _intent("open_folder", folder)
+
+    if folder:
+        folder_action_words = OPEN_WORDS + (
+            "go to",
+            "navigate to",
+            "open up",
+            "show me",
+        )
+
+        if _contains(text, folder_action_words):
+            return _intent(
+                "open_folder",
+                folder,
+                confidence=0.96
+            )
 
     # System actions. Use action phrases rather than matching words such as
     # "shutdown" anywhere in an unrelated sentence.
