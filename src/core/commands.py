@@ -3,10 +3,19 @@ from src.commands.browser import *
 from src.commands.files import *
 from src.commands.system import *
 from src.commands.datetime_cmd import *
+
 from src.automation.resolver import resolve_command
-from src.automation.app_control import open_app, close_app, focus_window
+from src.automation.app_control import (
+    open_app,
+    close_app,
+    focus_window,
+    restart_app,
+)
 
-
+from src.automation.workflow import (
+    split_workflow,
+    is_workflow,
+)
 # ---------------- Command Lists ---------------- #
 
 COMMANDS = {
@@ -15,8 +24,6 @@ COMMANDS = {
 
     "chrome": [
         "open chrome",
-        "launch chrome",
-        "start chrome",
         "open browser"
     ],
 
@@ -226,144 +233,78 @@ def execute_command(command: str):
 
     command = command.lower().strip()
 
-    # ---------- Natural-language command bridge ---------- #
-    # Resolve the user intent before falling back to the legacy command
-    # phrases. The resolver never executes commands by itself.
-    resolved = resolve_command(command)
-
-    if resolved:
-        intent = resolved["intent"]
-        target = resolved.get("target")
-
-        if intent == "exit":
-            return "EXIT"
-
-        if intent == "open_app":
-            _, message = open_app(target)
-            return message
-
-        if intent == "close_app":
-            _, message = close_app(target)
-            return message
-
-        if intent == "focus_app":
-            if focus_window(target):
-                return f"Switched to {target}."
-            return f"I couldn't find an open {target} window."
-
-        if intent == "restart_app":
-            close_app(target)
-            _, message = open_app(target)
-            return f"Restarting {target}." if message else message
-
-        if intent == "open_website":
-            website_commands = {
-                "google": open_google,
-                "youtube": open_youtube,
-                "github": open_github,
-                "chatgpt": open_chatgpt,
-                "linkedin": open_linkedin,
-                "gmail": open_gmail,
-                "leetcode": open_leetcode,
-                "stackoverflow": open_stackoverflow,
-                "maps": open_maps,
-            }
-            fn = website_commands.get(target)
-            if fn:
-                return fn()
-
-        if intent == "open_folder":
-            folder_commands = {
-                "downloads": open_downloads,
-                "documents": open_documents,
-                "desktop": open_desktop,
-                "pictures": open_pictures,
-                "music": open_music,
-                "videos": open_videos,
-                "thispc": open_this_pc,
-                "recyclebin": open_recycle_bin,
-            }
-            fn = folder_commands.get(target)
-            if fn:
-                return fn()
-
-        if intent == "search":
-            search_commands = {
-                "google": search_google,
-                "youtube": search_youtube,
-                "github": search_github,
-                "maps": search_maps,
-            }
-            fn = search_commands.get(target)
-            if fn:
-                return fn(resolved["query"])
-
-        if intent == "search_wikipedia":
-            return search_wikipedia(resolved["query"])
-
-        system_commands = {
-            "shutdown": shutdown,
-            "restart": restart,
-            "lock": lock_pc,
-            "sleep": sleep,
-            "hibernate": hibernate,
-            "logout": logout,
-            "cancel_shutdown": cancel_shutdown,
-            "battery": battery_status,
-            "cpu": cpu_usage,
-            "ram": ram_usage,
-            "disk": disk_usage,
-            "uptime": uptime,
-            "time": current_time,
-            "date": current_date,
-            "day": current_day,
-            "month": current_month,
-            "year": current_year,
-        }
-        fn = system_commands.get(intent)
-        if fn:
-            return fn()
-
     # Exit
 
     if command in ["exit", "bye", "stop", "goodbye"]:
 
         return "EXIT"
 
-    # ---------- Apps ---------- #
 
-    if any(c in command for c in COMMANDS["chrome"]):
-        return open_chrome()
+    # Multi-step workflow
 
-    if any(c in command for c in COMMANDS["edge"]):
-        return open_edge()
+    if allow_workflow and is_workflow(command):
 
-    if any(c in command for c in COMMANDS["firefox"]):
-        return open_firefox()
+        steps = split_workflow(command)
 
-    if any(c in command for c in COMMANDS["vscode"]):
-        return open_vscode()
+        results = []
 
-    if any(c in command for c in COMMANDS["notepad"]):
-        return open_notepad()
+        for step in steps:
 
-    if any(c in command for c in COMMANDS["calculator"]):
-        return open_calculator()
+            result = execute_command(
+                step,
+                allow_workflow=False
+            )
 
-    if any(c in command for c in COMMANDS["paint"]):
-        return open_paint()
+            if result == "EXIT":
+                return "EXIT"
 
-    if any(c in command for c in COMMANDS["explorer"]):
-        return open_explorer()
+            if result:
+                results.append(result)
 
-    if any(c in command for c in COMMANDS["cmd"]):
-        return open_cmd()
+        return " ".join(results)
 
-    if any(c in command for c in COMMANDS["powershell"]):
-        return open_powershell()
+    
+    # ---------- Natural-language desktop apps ---------- #
 
-    if any(c in command for c in COMMANDS["taskmanager"]):
-        return open_task_manager()
+    intent = resolve_command(command)
+
+    if intent:
+        if intent.name == "open_app":
+            _, message = open_app(intent.target)
+            return message
+
+        if intent.name == "close_app":
+            _, message = close_app(intent.target)
+            return message
+
+        if intent.name == "focus_app":
+            if focus_window(intent.target):
+                return f"Switched to {intent.target}."
+            return f"I couldn't find an open {intent.target} window."
+
+        if intent.name == "restart_app":
+            _, message = restart_app(intent.target)
+            return message
+
+    # ---------- Legacy app commands ---------- #
+
+    legacy_app_handlers = {
+        "chrome": open_chrome,
+        "edge": open_edge,
+        "firefox": open_firefox,
+        "vscode": open_vscode,
+        "notepad": open_notepad,
+        "calculator": open_calculator,
+        "paint": open_paint,
+        "explorer": open_explorer,
+        "cmd": open_cmd,
+        "powershell": open_powershell,
+        "taskmanager": open_task_manager,
+    }
+
+    for key, handler in legacy_app_handlers.items():
+        if command in COMMANDS[key]:
+            return handler()
 
     # ---------- Browser ---------- #
 

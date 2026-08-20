@@ -1,7 +1,5 @@
 """Local natural-language command resolver for EVI.
 
-This module converts common natural-language desktop requests into a small,
-validated intent structure. It deliberately does not execute anything.
 """
 
 import re
