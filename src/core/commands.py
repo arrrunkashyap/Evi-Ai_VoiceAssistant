@@ -229,7 +229,7 @@ COMMANDS = {
 
 # ---------------- Execute ---------------- #
 
-def execute_command(command: str):
+def execute_command(command: str, allow_workflow=True):
 
     command = command.lower().strip()
 
@@ -269,21 +269,25 @@ def execute_command(command: str):
     intent = resolve_command(command)
 
     if intent:
-        if intent.name == "open_app":
-            _, message = open_app(intent.target)
+
+        action = intent.get("intent")
+        target = intent.get("target")
+
+        if action == "open_app":
+            _, message = open_app(target)
             return message
 
-        if intent.name == "close_app":
-            _, message = close_app(intent.target)
+        if action == "close_app":
+            _, message = close_app(target)
             return message
 
-        if intent.name == "focus_app":
-            if focus_window(intent.target):
-                return f"Switched to {intent.target}."
-            return f"I couldn't find an open {intent.target} window."
+        if action == "focus_app":
+            if focus_window(target):
+                return f"Switched to {target}."
+            return f"I couldn't find an open {target} window."
 
-        if intent.name == "restart_app":
-            _, message = restart_app(intent.target)
+        if action == "restart_app":
+            _, message = restart_app(target)
             return message
 
     # ---------- Legacy app commands ---------- #
@@ -332,7 +336,7 @@ def execute_command(command: str):
     if any(c in command for c in COMMANDS["stackoverflow"]):
         return open_stackoverflow()
 
-    # ---------- Search ---------- #
+    # ---------- fallback Search ---------- #
 
     if command.startswith("search google "):
         return search_google(command.replace("search google", "").strip())
@@ -349,6 +353,91 @@ def execute_command(command: str):
     if command.startswith("wikipedia "):
         return search_wikipedia(command.replace("wikipedia", "").strip())
 
+
+
+    # ---------- Natural-language search ---------- #
+
+    if intent:
+
+        action = intent.get("intent")
+        target = intent.get("target")
+        query = intent.get("query")
+
+        if action == "search":
+
+            if not query:
+                return "What would you like me to search for?"
+
+            if target == "google":
+                return search_google(query)
+
+            if target == "youtube":
+                return search_youtube(query)
+
+            if target == "github":
+                return search_github(query)
+
+            if target == "maps":
+                return search_maps(query)
+
+
+        # ---------- Wikipedia ---------- #
+
+        if action == "search_wikipedia":
+
+            if not query:
+                return "What would you like me to search on Wikipedia?"
+
+            return search_wikipedia(query)
+        # ---------- Natural-language websites ---------- #
+
+    if intent:
+
+        action = intent.get("intent")
+        target = intent.get("target")
+
+        if action == "open_website":
+            website_handlers = {
+                "google": open_google,
+                "youtube": open_youtube,
+                "github": open_github,
+                "chatgpt": open_chatgpt,
+                "linkedin": open_linkedin,
+                "gmail": open_gmail,
+                "leetcode": open_leetcode,
+                "stackoverflow": open_stackoverflow,
+                "maps": open_maps,
+        }
+
+        handler = website_handlers.get(target)
+
+        if handler:
+            return handler()
+
+    # ---------- Natural-language folders ---------- #
+
+    if intent:
+
+        action = intent.get("intent")
+        target = intent.get("target")
+
+        if action == "open_folder":
+
+            folder_handlers = {
+                "downloads": open_downloads,
+                "documents": open_documents,
+                "desktop": open_desktop,
+                "pictures": open_pictures,
+                "music": open_music,
+                "videos": open_videos,
+                "thispc": open_this_pc,
+                "recyclebin": open_recycle_bin,
+            }
+
+            handler = folder_handlers.get(target)
+
+            if handler:
+                return handler()        
     # ---------- Files ---------- #
 
     if any(c in command for c in COMMANDS["downloads"]):
